@@ -1,0 +1,153 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ──────────────────────────────────────────────
+    // Fonctions utilitaires
+    // ──────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Premium : supporte les deux structures (web racine + mobile imbriqué)
+    function isPremium() {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && (u.get('plan', 'free') in ['premium', 'family'] ||
+            u.get('subscription', {}).get('plan', 'free') in ['premium', 'family']);
+    }
+
+    // Compte non suspendu
+    function isActive() {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && (u.get('status', 'active') != 'suspended' &&
+            u.get('subscription', {}).get('isActive', true) != false);
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)');
+    }
+
+    function isVideo() {
+      return request.resource.contentType.matches('video/(mp4|webm|quicktime|x-msvideo)');
+    }
+
+    function maxSize(mb) {
+      return request.resource.size <= mb * 1024 * 1024;
+    }
+
+    // ──────────────────────────────────────────────
+    // Avatars utilisateurs
+    // /users/{userId}/avatar/{filename}
+    // - Lecture   : tout utilisateur authentifié
+    // - Écriture  : propriétaire (image < 2 Mo) ou admin
+    // - Suppression : propriétaire ou admin
+    // ──────────────────────────────────────────────
+    match /users/{userId}/avatar/{filename} {
+      allow read: if isAuthenticated();
+
+      allow write: if (isOwner(userId) && isImage() && maxSize(2))
+                   || isAdmin();
+
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ──────────────────────────────────────────────
+    // Médias des contenus (films, séries, animés)
+    // /contents/{contentId}/poster/{filename}    → affiche
+    // /contents/{contentId}/cover/{filename}     → bannière
+    // /contents/{contentId}/trailer/{filename}   → bande-annonce
+    // /contents/{contentId}/video/{filename}     → vidéo principale
+    // /contents/{contentId}/episodes/{episodeId}/{filename}
+    //
+    // Lecture :
+    //   - poster / cover / trailer : authentifié
+    //   - video / épisodes         : premium + actif (ou admin)
+    // Écriture / Suppression : admin uniquement
+    // ──────────────────────────────────────────────
+
+    // Affiches et bannières — tout utilisateur authentifié peut lire
+    match /contents/{contentId}/poster/{filename} {
+      allow read: if isAuthenticated();
+      allow write, delete: if isAdmin();
+    }
+
+    match /contents/{contentId}/cover/{filename} {
+      allow read: if isAuthenticated();
+      allow write, delete: if isAdmin();
+    }
+
+    // Bandes-annonces — tout utilisateur authentifié peut lire
+    match /contents/{contentId}/trailer/{filename} {
+      allow read: if isAuthenticated();
+      allow write, delete: if isAdmin();
+    }
+
+    // Vidéos principales — premium + actif uniquement (ou admin)
+    match /contents/{contentId}/video/{filename} {
+      allow read: if isAdmin() || (isPremium() && isActive());
+      allow write, delete: if isAdmin();
+    }
+
+    // Épisodes (séries / animés) — premium + actif uniquement (ou admin)
+    match /contents/{contentId}/episodes/{allPaths=**} {
+      allow read: if isAdmin() || (isPremium() && isActive());
+      allow write, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────
+    // Images des événements
+    // /events/{eventId}/{filename}
+    // - Lecture   : public (les events publiés sont visibles sans connexion)
+    // - Écriture / Suppression : admin uniquement
+    // ──────────────────────────────────────────────
+    match /events/{eventId}/{filename} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────
+    // Images des témoignages
+    // /testimonials/{testimonialId}/{filename}
+    // - Lecture   : public (landing page)
+    // - Écriture / Suppression : admin uniquement
+    // ──────────────────────────────────────────────
+    match /testimonials/{testimonialId}/{filename} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────
+    // Thumbnails générés automatiquement (Cloud Functions)
+    // /thumbnails/{allPaths}
+    // - Lecture   : authentifié
+    // - Écriture  : bloqué côté client (Cloud Functions bypasse les rules)
+    // ──────────────────────────────────────────────
+    match /thumbnails/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write, delete: if false;
+    }
+
+    // ──────────────────────────────────────────────
+    // Règle par défaut : tout refuser
+    // ──────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
