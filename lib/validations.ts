@@ -16,6 +16,8 @@ export const contentSchema = z.object({
   productionName: z.string().optional(),
   accessLevel: z.enum(['free', 'premium']),
   isForKids: z.boolean(),
+  isFeatured: z.boolean(),
+  isTrending: z.boolean(),
   status: z.enum(['draft', 'published']),
   posterUrl: z.string().optional(),
   coverUrl: z.string().optional(),

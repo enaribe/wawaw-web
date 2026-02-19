@@ -35,6 +35,9 @@ export interface Content {
   coverUrl?: string;
   rating: number;
   viewCount: number;
+  likesCount: number;
+  isFeatured: boolean;
+  isTrending: boolean;
   directorName?: string;
   directorAvatarUrl?: string;
   productionName?: string;

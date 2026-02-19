@@ -13,8 +13,12 @@ export default function NewContentPage() {
       ...data,
       seasons,
       viewCount: 0,
+      likesCount: 0,
       posterUrl: data.posterUrl ?? '',
       rating: data.rating ?? 0,
+      isFeatured: data.isFeatured ?? false,
+      isTrending: data.isTrending ?? false,
+      isForKids: data.isForKids ?? false,
     });
   };
 

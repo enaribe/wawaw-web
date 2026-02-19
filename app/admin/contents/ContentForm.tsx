@@ -92,8 +92,10 @@ export function ContentForm({
     defaultValues: {
       type: 'movie',
       accessLevel: 'free',
-      status: 'draft',
+      status: 'published',
       isForKids: false,
+      isFeatured: false,
+      isTrending: false,
       genres: [],
       languages: [],
       year: new Date().getFullYear(),
@@ -298,17 +300,29 @@ export function ContentForm({
                 />
               </div>
 
-              <Controller
-                name="isForKids"
-                control={control}
-                render={({ field }) => (
-                  <Toggle
-                    value={field.value}
-                    onChange={field.onChange}
-                    label="Contenu pour enfants"
-                  />
-                )}
-              />
+              <div className="flex flex-wrap gap-6">
+                <Controller
+                  name="isForKids"
+                  control={control}
+                  render={({ field }) => (
+                    <Toggle value={field.value} onChange={field.onChange} label="Contenu pour enfants" />
+                  )}
+                />
+                <Controller
+                  name="isFeatured"
+                  control={control}
+                  render={({ field }) => (
+                    <Toggle value={field.value} onChange={field.onChange} label="Mis en avant (hero)" />
+                  )}
+                />
+                <Controller
+                  name="isTrending"
+                  control={control}
+                  render={({ field }) => (
+                    <Toggle value={field.value} onChange={field.onChange} label="Tendance" />
+                  )}
+                />
+              </div>
             </div>
           </Tabs.Content>
 

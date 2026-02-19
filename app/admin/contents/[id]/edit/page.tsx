@@ -14,7 +14,13 @@ export default function EditContentPage({ params }: { params: Promise<{ id: stri
   const handleSubmit = async (data: ContentFormData, seasons: Season[]) => {
     await updateContent.mutateAsync({
       id,
-      data: { ...data, seasons },
+      data: {
+        ...data,
+        seasons,
+        isFeatured: data.isFeatured ?? false,
+        isTrending: data.isTrending ?? false,
+        isForKids: data.isForKids ?? false,
+      },
     });
   };
 
@@ -57,7 +63,9 @@ export default function EditContentPage({ params }: { params: Promise<{ id: stri
         directorName: content.directorName,
         productionName: content.productionName,
         accessLevel: content.accessLevel,
-        isForKids: content.isForKids,
+        isForKids: content.isForKids ?? false,
+        isFeatured: content.isFeatured ?? false,
+        isTrending: content.isTrending ?? false,
         status: content.status,
       }}
       defaultSeasons={content.seasons ?? []}

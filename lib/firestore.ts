@@ -28,6 +28,13 @@ import type {
 
 // ── Helpers ──────────────────────────────────────────────
 
+/** Supprime récursivement les valeurs undefined pour éviter les erreurs Firestore */
+function stripUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 function toDate(val: unknown): string {
   if (!val) return new Date().toISOString();
   if (val instanceof Timestamp) return val.toDate().toISOString();
@@ -73,7 +80,11 @@ export async function getContent(id: string): Promise<Content | null> {
 
 export async function createContent(data: Omit<Content, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const ref = await addDoc(collection(db, 'contents'), {
-    ...data,
+    ...stripUndefined(data),
+    // Garantir la présence des champs requis par le mobile
+    likesCount: data.likesCount ?? 0,
+    isFeatured: data.isFeatured ?? false,
+    isTrending: data.isTrending ?? false,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
@@ -82,7 +93,7 @@ export async function createContent(data: Omit<Content, 'id' | 'createdAt' | 'up
 
 export async function updateContent(id: string, data: Partial<Content>): Promise<void> {
   await updateDoc(doc(db, 'contents', id), {
-    ...data,
+    ...stripUndefined(data),
     updatedAt: Timestamp.now(),
   });
 }
@@ -112,16 +123,31 @@ export async function getEvent(id: string): Promise<Event | null> {
   return mapDoc<Event>(snap);
 }
 
+function toTimestamp(val: string | undefined | null): Timestamp | null {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : Timestamp.fromDate(d);
+}
+
 export async function createEvent(data: Omit<Event, 'id' | 'createdAt'>): Promise<string> {
   const ref = await addDoc(collection(db, 'events'), {
-    ...data,
+    ...stripUndefined(data),
+    startDate: toTimestamp(data.startDate as unknown as string) ?? data.startDate,
+    endDate: toTimestamp(data.endDate as unknown as string) ?? data.endDate ?? null,
     createdAt: Timestamp.now(),
   });
   return ref.id;
 }
 
 export async function updateEvent(id: string, data: Partial<Event>): Promise<void> {
-  await updateDoc(doc(db, 'events', id), data);
+  const update: Record<string, unknown> = { ...stripUndefined(data) };
+  if (typeof data.startDate === 'string') {
+    update.startDate = toTimestamp(data.startDate) ?? data.startDate;
+  }
+  if (typeof data.endDate === 'string') {
+    update.endDate = toTimestamp(data.endDate) ?? data.endDate;
+  }
+  await updateDoc(doc(db, 'events', id), update);
 }
 
 export async function deleteEvent(id: string): Promise<void> {
